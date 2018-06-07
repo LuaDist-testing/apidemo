@@ -1,16 +1,16 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "apidemo"
-version = "1.0-1"
+version = "1.0-2"
 -- LuaDist source
 source = {
-  tag = "1.0-1",
+  tag = "1.0-2",
   url = "git://github.com/LuaDist-testing/apidemo.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/tylerneylon/lua_api_demo",
---   tag = "v1.0"
+--   tag = "v1.0-2"
 -- }
 description = {
   summary = "A module to teach or learn about Lua's C API",
