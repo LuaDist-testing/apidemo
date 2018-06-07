@@ -11,14 +11,13 @@
 // simulated.
 //
 
-#include "lua.h"
-#include "lauxlib.h"
+#include <lua.h>
+#include <lauxlib.h>
 
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
-
 
 #define states_table_key     "ApiDemo.SavedStates"
 #define demo_state_metatable "ApiDemo.LuaState"
@@ -98,7 +97,8 @@ const char *help_string =
   " int lua_getmetatable(L, int i)       push mt(stk[i])if any [-1 +0|1 -]  \n"
   "                                                                         \n"
   " int lua_next(L, int i)               pop k/push k,v if any [-1 +0|2 e]  \n"
-  " szt lua_objlen(L, int i)             #stk[i], assuming seq [-0 +0 -]    \n"
+  " szt lua_objlen(L, int i)  Lua 5.1    #stk[i], assuming seq [-0 +0 -]    \n"
+  " szt lua_rawlen(L, int i)  Lua 5.2+   #stk[i], assuming seq [-0 +0 -]    \n"
   "                                                                         \n"
   "     lua_setglobal(L, str name)       pops v; _G[name]=v    [-1 +0 e]    \n"
   "     lua_getglobal(L, str name)       pushes _G[name]       [-0 +1 e]    \n"
@@ -138,7 +138,6 @@ const char *help_string =
   " str luaL_checkstring(L, int n)       str(stk[n]) or err    [-0 +0 v]    \n"
   "                                                                         \n"
   "     luaL_checktype(L, int n, int tp) err if tp(stk[n])!=tp [-0 +0 v]    \n"
-  " int luaL_typerror(L, int n, str msg) err;msg=expected type [-0 +0 v]    \n"
   "                                                                         \n"
   "                                                                         \n"
   "-- running Lua code ---------------------------------------------------- \n"
@@ -497,6 +496,13 @@ static int demo_luaL_newstate(lua_State *L) {
   return 1;  // Number of values to return that are on the stack.
 }
 
+// ### Macros to work with luaL_checkint and luaL_optint in Lua 5.3.
+
+#if LUA_VERSION_NUM == 503
+#define luaL_checkint(L, arg) (int)(luaL_checkinteger(L, arg))
+#define luaL_optint(L, arg, d) (int)(luaL_optinteger(L, arg, d))
+#endif
+
 // ### Macros that make it easy to wrap Lua C API functions.
 
 // A typical wrapper function will look something like this pseudocode:
@@ -676,7 +682,6 @@ static int demo_luaL_newstate(lua_State *L) {
 fn_int_int_in          (lua_call);
 fn_int_in_int_out      (lua_checkstack);
 fn_int_in              (lua_concat);
-fn_int_int_in          (lua_equal);
 fn_int_string_in       (lua_getfield);
 fn_string_in           (lua_getglobal);
 fn_int_in_int_out      (lua_getmetatable);
@@ -692,10 +697,8 @@ fn_int_in_int_out      (lua_isnoneornil);
 fn_int_in_int_out      (lua_isnumber);
 fn_int_in_int_out      (lua_isstring);
 fn_int_in_int_out      (lua_istable);
-fn_int_int_in          (lua_lessthan);
 fn_nothing_in          (lua_newtable);
 fn_int_in_int_out      (lua_next);
-fn_int_in_int_out      (lua_objlen);
 fn_int_in              (lua_pop);
 fn_int_in              (lua_pushboolean);
 fn_string_int_in       (lua_pushlstring);
@@ -722,6 +725,16 @@ fn_int_in_string_out   (lua_tostring);
 fn_int_in_int_out      (lua_type);
 fn_int_in_string_out   (lua_typename);
 
+// Version-specific functions.
+
+#if LUA_VERSION_NUM == 501
+fn_int_int_in          (lua_equal);
+fn_int_int_in          (lua_lessthan);
+fn_int_in_int_out      (lua_objlen);
+#else
+fn_int_in_int_out      (lua_rawlen);
+#endif
+
 fn_int_string_in_int_out  (luaL_argerror);
 fn_int_string_in_int_out  (luaL_callmeta);
 fn_int_in                 (luaL_checkany);
@@ -738,7 +751,6 @@ fn_string_in_int_out      (luaL_loadstring);
 // Defined below:          luaL_optnumber
 // Defined below:          luaL_optstring
 fn_int_in_string_out      (luaL_typename);
-fn_int_string_in_int_out  (luaL_typerror);
 
 // ### Function wrappers that need special-case code.
 
@@ -838,7 +850,6 @@ static int setup_globals(lua_State *L) {
   register_fn(lua_call);
   register_fn(lua_checkstack);
   register_fn(lua_concat);
-  register_fn(lua_equal);
   register_fn(lua_getfield);
   register_fn(lua_getglobal);
   register_fn(lua_getmetatable);
@@ -854,10 +865,8 @@ static int setup_globals(lua_State *L) {
   register_fn(lua_isnumber);
   register_fn(lua_isstring);
   register_fn(lua_istable);
-  register_fn(lua_lessthan);
   register_fn(lua_newtable);
   register_fn(lua_next);
-  register_fn(lua_objlen);
   register_fn(lua_pcall);
   register_fn(lua_pop);
   register_fn(lua_pushboolean);
@@ -886,6 +895,16 @@ static int setup_globals(lua_State *L) {
   register_fn(lua_type);
   register_fn(lua_typename);
 
+// Version-specific functions.
+
+#if LUA_VERSION_NUM == 501
+  register_fn(lua_equal);
+  register_fn(lua_lessthan);
+  register_fn(lua_objlen);
+#else
+  register_fn(lua_rawlen);
+#endif
+
   register_fn(luaL_argerror);
   register_fn(luaL_callmeta);
   register_fn(luaL_checkany);
@@ -902,7 +921,6 @@ static int setup_globals(lua_State *L) {
   register_fn(luaL_optnumber);
   register_fn(luaL_optstring);
   register_fn(luaL_typename);
-  register_fn(luaL_typerror);
 
   // Set up C-like constants.
   lua_pushnumber(L, 0);
@@ -926,7 +944,9 @@ static int setup_globals(lua_State *L) {
   register_const(LUA_TTHREAD);
 
   register_const(LUA_REGISTRYINDEX);
+#if LUA_VERSION_NUM == 501
   register_const(LUA_GLOBALSINDEX);
+#endif
 
   register_const(LUA_MULTRET);
 
@@ -957,7 +977,11 @@ int luaopen_apidemo(lua_State *L) {
     {"help",          show_help},
     {NULL, NULL}
   };
+#if LUA_VERSION_NUM == 501
   luaL_register(L, "apidemo", fns);
+#else
+  luaL_newlib(L, fns);
+#endif
       // stack = [apidemo]
 
   return 1;  // Number of Lua-facing return values on the Lua stack in L.
